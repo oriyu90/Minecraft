@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MC Server Manager Web Console</title>
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons (CDN) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#1e293b',
+                            950: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* カスタムスクロールバー */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- ヘッダー -->
+    <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
+        <div class="flex items-center space-x-3">
+            <div class="bg-emerald-600 p-2 rounded-lg text-white">
+                <i data-lucide="terminal" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight">MC Server Manager</h1>
+                <p class="text-xs text-slate-400">Web API Remote Console v5.0</p>
+            </div>
+        </div>
+
+        <!-- サーバー選択 ＆ API 接続状態 -->
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-850 rounded-lg border border-slate-700">
+                <span id="connection-indicator" class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                <span id="connection-text" class="text-xs font-medium text-slate-300">未接続</span>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <label for="server-select" class="text-xs text-slate-400 font-medium hidden sm:inline">操作対象:</label>
+                <select id="server-select" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 max-w-[200px]" disabled>
+                    <option value="">サーバー未取得</option>
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-1 flex-col lg:flex-row">
+        <!-- サイドナビゲーション -->
+        <nav class="w-full lg:w-64 bg-slate-900 border-r border-slate-800 p-4 flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-x-visible">
+            <button onclick="switchTab('dashboard')" data-tab-btn="dashboard" class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium w-full transition bg-emerald-600 text-white shadow-lg shadow-emerald-900/20">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span>ダッシュボード</span>
+            </button>
+            <button onclick="switchTab('console')" data-tab-btn="console" class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium w-full transition text-slate-400 hover:bg-slate-800 hover:text-slate-200">
+                <i data-lucide="code-2" class="w-5 h-5"></i>
+                <span>コンソール</span>
+            </button>
+            <button onclick="switchTab('users')" data-tab-btn="users" class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium w-full transition text-slate-400 hover:bg-slate-800 hover:text-slate-200">
+                <i data-lucide="users" class="w-5 h-5"></i>
+                <span>プレイヤー管理</span>
+            </button>
+            <button onclick="switchTab('settings')" data-tab-btn="settings" class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium w-full transition text-slate-400 hover:bg-slate-800 hover:text-slate-200 lg:mt-auto">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+                <span>接続設定</span>
+            </button>
+        </nav>
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 p-6 overflow-y-auto">
+            
+            <!-- 【ダッシュボード タブ】 -->
+            <section id="tab-dashboard" class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold tracking-tight">サーバー一覧</h2>
+                    <button onclick="refreshDashboard()" class="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg border border-slate-700 transition">
+                        <i data-lucide="rotate-cw" class="w-4 h-4" id="refresh-icon"></i>
+                        <span>更新</span>
+                    </button>
+                </div>
+
+                <div id="servers-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <!-- サーバーカードが動的に挿入されます -->
+                    <div class="col-span-full py-12 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl">
+                        <i data-lucide="server" class="w-12 h-12 mx-auto mb-3 opacity-30"></i>
+                        <p>接続設定が完了していないか、APIサーバーが起動していません。</p>
+                        <button onclick="switchTab('settings')" class="mt-4 text-emerald-400 hover:text-emerald-300 text-sm font-medium underline">接続設定を確認する</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 【コンソール タブ】 -->
+            <section id="tab-console" class="hidden space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold tracking-tight">サーバーコンソール</h2>
+                        <p class="text-sm text-slate-400" id="console-server-name">未選択</p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                            <input type="checkbox" id="auto-scroll-log" checked class="rounded bg-slate-800 border-slate-700 text-emerald-600 focus:ring-emerald-500 w-4 h-4">
+                            <span>自動更新 (2秒ごと)</span>
+                        </label>
+                        <button onclick="fetchLogs()" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition" title="ログを再読み込み">
+                            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ログ出力エリア -->
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 font-mono text-sm h-[500px] overflow-y-auto flex flex-col gap-1 shadow-inner relative" id="log-container">
+                    <!-- ログ行がここに動的に生成されます -->
+                    <div class="text-slate-500 text-center my-auto">サーバーを選択するか、ログを読み込んでください。</div>
+                </div>
+
+                <!-- コマンド入力フォーム -->
+                <form id="command-form" class="flex gap-2">
+                    <input type="text" id="command-input" placeholder="コンソールコマンドを入力... (例: say Hello World)" class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500" disabled>
+                    <button type="submit" id="command-submit" class="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 px-6 py-3 rounded-xl font-medium text-sm transition flex items-center gap-2 text-white" disabled>
+                        <span>送信</span>
+                        <i data-lucide="send" class="w-4 h-4"></i>
+                    </button>
+                </form>
+            </section>
+
+            <!-- 【プレイヤー管理 タブ】 -->
+            <section id="tab-users" class="hidden space-y-6">
+                <div>
+                    <h2 class="text-xl font-bold tracking-tight">プレイヤー・アクセス管理</h2>
+                    <p class="text-sm text-slate-400" id="users-server-name">選択中のサーバー: なし</p>
+                </div>
+
+                <!-- サブカテゴリタブ -->
+                <div class="border-b border-slate-800 flex gap-4 overflow-x-auto">
+                    <button onclick="switchUserSubTab('whitelist')" id="subtab-btn-whitelist" class="px-4 py-2 border-b-2 border-emerald-500 text-emerald-400 text-sm font-semibold whitespace-nowrap">
+                        ホワイトリスト
+                    </button>
+                    <button onclick="switchUserSubTab('ops')" id="subtab-btn-ops" class="px-4 py-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 text-sm font-semibold whitespace-nowrap">
+                        OP権限 (管理者)
+                    </button>
+                    <button onclick="switchUserSubTab('bans')" id="subtab-btn-bans" class="px-4 py-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 text-sm font-semibold whitespace-nowrap">
+                        BANリスト
+                    </button>
+                </div>
+
+                <!-- ホワイトリスト表示 -->
+                <div id="user-pane-whitelist" class="space-y-4">
+                    <div class="flex flex-wrap gap-4 items-center justify-between">
+                        <div class="flex-1 min-w-[280px]">
+                            <form id="whitelist-add-form" class="flex gap-2">
+                                <input type="text" id="whitelist-input" placeholder="追加するプレイヤー名を入力" class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" required>
+                                <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl text-sm font-medium transition text-white">追加</button>
+                            </form>
+                        </div>
+                        <button onclick="fetchWhitelist()" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition" title="再読み込み">
+                            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-850 text-xs font-semibold text-slate-400 uppercase border-b border-slate-800">
+                                    <th class="px-6 py-3">プレイヤー名</th>
+                                    <th class="px-6 py-3">UUID</th>
+                                    <th class="px-6 py-3">状態</th>
+                                    <th class="px-6 py-3 text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="whitelist-table-body" class="divide-y divide-slate-800 text-sm">
+                                <tr>
+                                    <td colspan="4" class="px-6 py-8 text-center text-slate-500">データを読み込んでください</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- OP権限表示 -->
+                <div id="user-pane-ops" class="hidden space-y-4">
+                    <div class="flex flex-wrap gap-4 items-center justify-between">
+                        <div class="flex-1 min-w-[280px]">
+                            <form id="ops-add-form" class="flex gap-2">
+                                <input type="text" id="ops-input" placeholder="追加する管理者プレイヤー名を入力" class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" required>
+                                <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl text-sm font-medium transition text-white">OP付与</button>
+                            </form>
+                        </div>
+                        <button onclick="fetchOps()" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition" title="再読み込み">
+                            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-850 text-xs font-semibold text-slate-400 uppercase border-b border-slate-800">
+                                    <th class="px-6 py-3">プレイヤー名</th>
+                                    <th class="px-6 py-3">UUID</th>
+                                    <th class="px-6 py-3 text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ops-table-body" class="divide-y divide-slate-800 text-sm">
+                                <tr>
+                                    <td colspan="3" class="px-6 py-8 text-center text-slate-500">データを読み込んでください</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- BANリスト表示 -->
+                <div id="user-pane-bans" class="hidden space-y-4">
+                    <div class="flex justify-end">
+                        <button onclick="fetchBans()" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition" title="再読み込み">
+                            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-850 text-xs font-semibold text-slate-400 uppercase border-b border-slate-800">
+                                    <th class="px-6 py-3">プレイヤー名</th>
+                                    <th class="px-6 py-3">UUID</th>
+                                    <th class="px-6 py-3">理由</th>
+                                    <th class="px-6 py-3 text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bans-table-body" class="divide-y divide-slate-800 text-sm">
+                                <tr>
+                                    <td colspan="4" class="px-6 py-8 text-center text-slate-500">データを読み込んでください</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 【接続設定 タブ】 -->
+            <section id="tab-settings" class="hidden space-y-6 max-w-2xl">
+                <div>
+                    <h2 class="text-xl font-bold tracking-tight">接続設定</h2>
+                    <p class="text-sm text-slate-400">MC Server Manager Web API と接続するための設定です。</p>
+                </div>
+
+                <form id="settings-form" class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="sm:col-span-2">
+                            <label for="host" class="block text-xs font-semibold text-slate-400 uppercase mb-2">ホスト / IPアドレス</label>
+                            <input type="text" id="host" placeholder="例: 192.168.1.10" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-200" required>
+                        </div>
+                        <div>
+                            <label for="port" class="block text-xs font-semibold text-slate-400 uppercase mb-2">ポート</label>
+                            <input type="number" id="port" placeholder="例: 25580" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-200" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="password" class="block text-xs font-semibold text-slate-400 uppercase mb-2">認証パスワード</label>
+                        <input type="password" id="password" placeholder="アプリの設定タブで決めたパスワード" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-200">
+                        <p class="text-xs text-slate-500 mt-1">※ パスワードを設定していない場合は空欄のままにしてください。</p>
+                    </div>
+
+                    <div class="pt-4 flex gap-3 border-t border-slate-800">
+                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 rounded-xl font-medium text-sm transition text-white">
+                            設定を保存
+                        </button>
+                        <button type="button" onclick="testConnection()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-5 py-2.5 rounded-xl font-medium text-sm border border-slate-700 transition">
+                            接続テスト
+                        </button>
+                    </div>
+                </form>
+
+                <div class="p-4 bg-slate-900/50 border border-slate-800 rounded-xl space-y-2 text-sm text-slate-400">
+                    <h3 class="font-semibold text-slate-300 flex items-center gap-2">
+                        <i data-lucide="shield-alert" class="w-4 h-4 text-amber-500"></i>
+                        セキュリティの注意事項
+                    </h3>
+                    <p>このWebアプリは完全にブラウザ上で動作します。入力したパスワードは外部サーバーには送信されず、お使いのブラウザのローカルストレージ（localStorage）のみに保存されます。</p>
+                    <p>Web APIは暗号化されていない HTTP 通信のため、外出先からアクセスする際はポート開放ではなく、<strong>Tailscale</strong> などの VPN 接続を経由することを強く推奨します。</p>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- トースト通知用のコンテナ -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none max-w-sm"></div>
+
+    <!-- アプリケーション・ロジック (JS) -->
+    <script>
+        // --- 状態管理オブジェクト ---
+        const state = {
+            host: '127.0.0.1',
+            port: '25580',
+            password: '',
+            servers: [],
+            selectedServerId: '',
+            activeTab: 'dashboard',
+            activeUserSubTab: 'whitelist',
+            isConnected: false,
+            pollingIntervals: {
+                dashboard: null,
+                console: null
+            }
+        };
+
+        // --- 初期ロード ---
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            initTabs();
+            testConnection(true); // サイレント接続テスト
+            startDashboardPolling();
+            setTimeout(() => lucide.createIcons(), 100);
+        });
+
+        // --- 設定の読み込みと保存 ---
+        function loadSettings() {
+            state.host = localStorage.getItem('mc_host') || '127.0.0.1';
+            state.port = localStorage.getItem('mc_port') || '25580';
+            state.password = localStorage.getItem('mc_password') || '';
+
+            document.getElementById('host').value = state.host;
+            document.getElementById('port').value = state.port;
+            document.getElementById('password').value = state.password;
+        }
+
+        document.getElementById('settings-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            state.host = document.getElementById('host').value.trim();
+            state.port = document.getElementById('port').value.trim();
+            state.password = document.getElementById('password').value;
+
+            localStorage.setItem('mc_host', state.host);
+            localStorage.setItem('mc_port', state.port);
+            localStorage.setItem('mc_password', state.password);
+
+            showToast('設定をブラウザに保存しました', 'success');
+            testConnection();
+        });
+
+        // --- 共通APIクライアント ---
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            const url = `http://${state.host}:${state.port}${endpoint}`;
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (state.password) {
+                headers['Authorization'] = `Bearer ${state.password}`;
+            }
+
+            const options = { method, headers };
+            if (body && (method === 'POST' || method === 'PUT')) {
+                options.body = JSON.stringify(body);
+            }
+
+            try {
+                const res = await fetch(url, options);
+                
+                if (res.status === 401) {
+                    throw new Error('認証に失敗しました。パスワードを確認してください。');
+                }
+                
+                if (!res.ok) {
+                    const errRes = await res.json().catch(() => ({}));
+                    throw new Error(errRes.error || `HTTPエラー: ${res.status}`);
+                }
+
+                return await res.json();
+            } catch (err) {
+                console.error(`API Call failed (${endpoint}):`, err);
+                throw err;
+            }
+        }
+
+        // --- 接続状況テスト ---
+        async function testConnection(silent = false) {
+            updateConnectionStatus(false, '接続試行中...');
+            try {
+                const data = await apiCall('/api/status');
+                updateConnectionStatus(true, `接続中 (v${data.appVersion || '5.0'})`);
+                if (!silent) showToast('APIサーバーと正常に接続できました！', 'success');
+                
+                // 接続成功したらサーバー一覧を取得
+                await fetchServers();
+                return true;
+            } catch (err) {
+                updateConnectionStatus(false, '未接続');
+                if (!silent) showToast(`接続失敗: ${err.message}`, 'error');
+                return false;
+            }
+        }
+
+        function updateConnectionStatus(connected, text) {
+            state.isConnected = connected;
+            const indicator = document.getElementById('connection-indicator');
+            const textEl = document.getElementById('connection-text');
+
+            if (connected) {
+                indicator.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
+                textEl.innerText = text;
+                textEl.className = "text-xs font-medium text-emerald-400";
+            } else {
+                indicator.className = "w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse";
+                textEl.innerText = text;
+                textEl.className = "text-xs font-medium text-rose-400";
+            }
+        }
+
+        // --- サーバー一覧の取得とセレクトボックス更新 ---
+        async function fetchServers() {
+            try {
+                const data = await apiCall('/api/servers');
+                state.servers = data.servers || [];
+                
+                const select = document.getElementById('server-select');
+                select.innerHTML = '';
+
+                if (state.servers.length === 0) {
+                    select.innerHTML = '<option value="">登録サーバーなし</option>';
+                    select.disabled = true;
+                    return;
+                }
+
+                select.disabled = false;
+                state.servers.forEach((srv) => {
+                    const option = document.createElement('option');
+                    option.value = srv.id;
+                    option.innerText = `${srv.name} (${srv.status})`;
+                    if (state.selectedServerId === srv.id) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+
+                // 初期選択サーバーがない場合、リストの最初を選択
+                if (!state.selectedServerId && state.servers.length > 0) {
+                    state.selectedServerId = state.servers[0].id;
+                    select.value = state.selectedServerId;
+                }
+
+                updateSelectedServerLabels();
+            } catch (err) {
+                console.error('Failed to fetch servers:', err);
+            }
+        }
+
+        // サーバー切り替え時
+        document.getElementById('server-select').addEventListener('change', (e) => {
+            state.selectedServerId = e.target.value;
+            updateSelectedServerLabels();
+            
+            // タブ特有の更新処理をキック
+            if (state.activeTab === 'console') {
+                fetchLogs();
+            } else if (state.activeTab === 'users') {
+                refreshUserPane();
+            }
+        });
+
+        function updateSelectedServerLabels() {
+            const current = state.servers.find(s => s.id === state.selectedServerId);
+            const name = current ? current.name : '未選択';
+            
+            document.getElementById('console-server-name').innerText = `対象: ${name}`;
+            document.getElementById('users-server-name').innerText = `対象: ${name}`;
+
+            const isConsoleActive = current && current.status === 'running';
+            document.getElementById('command-input').disabled = !isConsoleActive;
+            document.getElementById('command-submit').disabled = !isConsoleActive;
+            if(!isConsoleActive) {
+                document.getElementById('command-input').placeholder = "サーバーが起動していないため送信できません。";
+            } else {
+                document.getElementById('command-input').placeholder = "コンソールコマンドを入力... (例: say Hello World)";
+            }
+        }
+
+
+        // --- タブ遷移制御 ---
+        function initTabs() {
+            // タブ自動切替
+            switchTab('dashboard');
+        }
+
+        function switchTab(tabId) {
+            state.activeTab = tabId;
+            const tabIds = ['dashboard', 'console', 'users', 'settings'];
+            
+            tabIds.forEach(id => {
+                const tabEl = document.getElementById(`tab-${id}`);
+                const btnEl = document.querySelector(`[data-tab-btn="${id}"]`);
+                
+                if (id === tabId) {
+                    tabEl.classList.remove('hidden');
+                    btnEl.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium w-full transition bg-emerald-600 text-white shadow-lg shadow-emerald-900/20";
+                } else {
+                    tabEl.classList.add('hidden');
+                    btnEl.className = "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium w-full transition text-slate-400 hover:bg-slate-800 hover:text-slate-200";
+                }
+            });
+
+            // バックグラウンド処理の管理
+            stopAllPolling();
+            if (tabId === 'dashboard') {
+                refreshDashboard();
+                startDashboardPolling();
+            } else if (tabId === 'console') {
+                fetchLogs();
+                startConsolePolling();
+            } else if (tabId === 'users') {
+                refreshUserPane();
+            }
+        }
+
+        function stopAllPolling() {
+            if (state.pollingIntervals.dashboard) clearInterval(state.pollingIntervals.dashboard);
+            if (state.pollingIntervals.console) clearInterval(state.pollingIntervals.console);
+        }
+
+        function startDashboardPolling() {
+            state.pollingIntervals.dashboard = setInterval(() => {
+                if (state.isConnected && state.activeTab === 'dashboard') {
+                    refreshDashboard(true); // サイレント更新
+                }
+            }, 5000);
+        }
+
+        function startConsolePolling() {
+            state.pollingIntervals.console = setInterval(() => {
+                const autoScrollCheckbox = document.getElementById('auto-scroll-log');
+                if (state.isConnected && state.activeTab === 'console' && autoScrollCheckbox && autoScrollCheckbox.checked) {
+                    const current = state.servers.find(s => s.id === state.selectedServerId);
+                    if (current && current.status === 'running') {
+                        fetchLogs(true);
+                    }
+                }
+            }, 2000);
+        }
+
+
+        // --- ダッシュボード処理 ---
+        async function refreshDashboard(silent = false) {
+            const icon = document.getElementById('refresh-icon');
+            if (icon && !silent) icon.classList.add('animate-spin');
+
+            try {
+                await fetchServers();
+                const grid = document.getElementById('servers-grid');
+                grid.innerHTML = '';
+
+                if (state.servers.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-span-full py-12 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl">
+                            <i data-lucide="server" class="w-12 h-12 mx-auto mb-3 opacity-30"></i>
+                            <p>登録されたプロファイルがないか、接続できません。</p>
+                        </div>`;
+                    lucide.createIcons();
+                    return;
+                }
+
+                state.servers.forEach(srv => {
+                    const card = createServerCard(srv);
+                    grid.appendChild(card);
+                });
+
+                lucide.createIcons();
+            } catch (err) {
+                if (!silent) showToast(`ダッシュボードの更新に失敗しました: ${err.message}`, 'error');
+            } finally {
+                if (icon && !silent) {
+                    setTimeout(() => icon.classList.remove('animate-spin'), 500);
+                }
+            }
+        }
+
+        function createServerCard(srv) {
+            const div = document.createElement('div');
+            div.className = "bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700 transition flex flex-col gap-4";
+
+            // ステータスバッジのスタイル設定
+            let statusColor = "bg-slate-850 text-slate-400";
+            let statusText = srv.status;
+            let dotPulse = "";
+
+            if (srv.status === 'running') {
+                statusColor = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                statusText = "起動中";
+                dotPulse = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping mr-1"></span>';
+            } else if (srv.status === 'stopped') {
+                statusColor = "bg-slate-800 text-slate-400 border border-slate-700";
+                statusText = "停止中";
+            } else if (srv.status === 'starting') {
+                statusColor = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+                statusText = "起動処理中...";
+                dotPulse = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-bounce mr-1"></span>';
+            } else if (srv.status === 'stopping') {
+                statusColor = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+                statusText = "停止処理中...";
+                dotPulse = '<span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-bounce mr-1"></span>';
+            }
+
+            // 起動時間フォーマット
+            const uptimeStr = srv.uptime ? formatUptime(srv.uptime) : '-';
+
+            div.innerHTML = `
+                <div class="flex items-start justify-between">
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-100 flex items-center gap-1.5">
+                            <i data-lucide="box" class="w-5 h-5 text-emerald-500"></i>
+                            ${srv.name}
+                        </h3>
+                        <p class="text-xs text-slate-500 font-mono mt-0.5">${srv.jar || '未知.jar'}</p>
+                    </div>
+                    <div class="flex items-center text-xs font-semibold px-2 py-1 rounded-md ${statusColor}">
+                        ${dotPulse}
+                        <span>${statusText}</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 text-xs border-y border-slate-800 py-3">
+                    <div class="space-y-1">
+                        <span class="text-slate-500 block">プレイヤー</span>
+                        <span class="font-bold text-slate-200">${srv.playerCount !== undefined ? `${srv.playerCount} / ${srv.maxPlayers || '?'}` : '-'}</span>
+                    </div>
+                    <div class="space-y-1">
+                        <span class="text-slate-500 block">ポート番号</span>
+                        <span class="font-mono font-bold text-slate-200">${srv.port || '-'}</span>
+                    </div>
+                    <div class="space-y-1 col-span-2">
+                        <span class="text-slate-500 block">稼働時間 (Uptime)</span>
+                        <span class="font-mono font-bold text-slate-200">${uptimeStr}</span>
+                    </div>
+                </div>
+
+                <!-- 操作ボタン群 -->
+                <div class="grid grid-cols-2 gap-2 mt-auto">
+                    <button onclick="controlServer('${srv.id}', 'start')" class="flex items-center justify-center gap-1.5 bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-600 hover:text-white px-3 py-2 rounded-lg text-xs font-semibold transition" ${srv.status !== 'stopped' ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''}>
+                        <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                        起動
+                    </button>
+                    <button onclick="controlServer('${srv.id}', 'stop')" class="flex items-center justify-center gap-1.5 bg-rose-600/10 text-rose-400 border border-rose-500/20 hover:bg-rose-600 hover:text-white px-3 py-2 rounded-lg text-xs font-semibold transition" ${srv.status !== 'running' ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''}>
+                        <i data-lucide="square" class="w-3.5 h-3.5"></i>
+                        停止
+                    </button>
+                    <button onclick="controlServer('${srv.id}', 'restart')" class="flex items-center justify-center gap-1.5 bg-amber-600/10 text-amber-400 border border-amber-500/20 hover:bg-amber-600 hover:text-white px-3 py-2 rounded-lg text-xs font-semibold transition" ${srv.status !== 'running' ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''}>
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                        再起動
+                    </button>
+                    <button onclick="controlServer('${srv.id}', 'kill')" class="flex items-center justify-center gap-1.5 bg-red-950/20 text-red-500 border border-red-500/20 hover:bg-red-600 hover:text-white px-3 py-2 rounded-lg text-xs font-semibold transition" ${srv.status === 'stopped' ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''}>
+                        <i data-lucide="skull" class="w-3.5 h-3.5"></i>
+                        強制終了
+                    </button>
+                </div>
+            `;
+            return div;
+        }
+
+        async function controlServer(id, action) {
+            const confirmed = (action === 'kill') ? confirm('本当にサーバーを強制終了しますか？データ破損の恐れがあります。') : true;
+            if (!confirmed) return;
+
+            try {
+                showToast(`サーバーへシグナル(${action})を送信しています...`, 'info');
+                const data = await apiCall(`/api/servers/${id}/${action}`, 'POST');
+                if (data.ok) {
+                    showToast('アクションが受け付けられました。', 'success');
+                    refreshDashboard();
+                }
+            } catch (err) {
+                showToast(`サーバー操作に失敗しました: ${err.message}`, 'error');
+            }
+        }
+
+        function formatUptime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return `${h}時間 ${m}分 ${s}秒`;
+        }
+
+
+        // --- コンソール・ログ処理 ---
+        async function fetchLogs(silent = false) {
+            if (!state.selectedServerId) return;
+            try {
+                const data = await apiCall(`/api/servers/${state.selectedServerId}/logs`);
+                const container = document.getElementById('log-container');
+                
+                // 初回のみ・あるいはログ件数変更があったときに完全に書き換える
+                container.innerHTML = '';
+                
+                if (!data.logs || data.logs.length === 0) {
+                    container.innerHTML = '<div class="text-slate-500 text-center my-auto">ログが見つかりませんでした</div>';
+                    return;
+                }
+
+                data.logs.forEach(log => {
+                    const line = document.createElement('div');
+                    line.className = "leading-relaxed break-all";
+                    
+                    // レベルに応じたカラーパッシブ
+                    let colorClass = "text-slate-300";
+                    if (log.level === 'WARN') {
+                        colorClass = "text-amber-400 font-semibold";
+                    } else if (log.level === 'ERRR' || log.level === 'ERROR') {
+                        colorClass = "text-rose-500 font-semibold";
+                    } else if (log.level === 'DBUG') {
+                        colorClass = "text-cyan-400";
+                    }
+
+                    line.innerHTML = `<span class="text-slate-500 select-none mr-2">[${log.time || ''}]</span><span class="${colorClass}">${escapeHtml(log.message)}</span>`;
+                    container.appendChild(line);
+                });
+
+                // 一番下にスクロール
+                container.scrollTop = container.scrollHeight;
+
+            } catch (err) {
+                if (!silent) {
+                    showToast(`ログの取得に失敗しました: ${err.message}`, 'error');
+                    document.getElementById('log-container').innerHTML = `<div class="text-rose-400 text-center my-auto">ログの取得に失敗しました (${err.message})</div>`;
+                }
+            }
+        }
+
+        // コマンド送信
+        document.getElementById('command-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('command-input');
+            const cmd = input.value.trim();
+            if (!cmd || !state.selectedServerId) return;
+
+            try {
+                const data = await apiCall(`/api/servers/${state.selectedServerId}/command`, 'POST', { command: cmd });
+                if (data.ok) {
+                    showToast(`コマンドを送信しました: ${cmd}`, 'success');
+                    input.value = '';
+                    fetchLogs(); // 即座に再読み込み
+                }
+            } catch (err) {
+                showToast(`コマンド送信失敗: ${err.message}`, 'error');
+            }
+        });
+
+
+        // --- プレイヤー（ユーザー）管理処理 ---
+        function switchUserSubTab(subTabId) {
+            state.activeUserSubTab = subTabId;
+            const subTabs = ['whitelist', 'ops', 'bans'];
+
+            subTabs.forEach(id => {
+                const pane = document.getElementById(`user-pane-${id}`);
+                const btn = document.getElementById(`subtab-btn-${id}`);
+                
+                if (id === subTabId) {
+                    pane.classList.remove('hidden');
+                    btn.className = "px-4 py-2 border-b-2 border-emerald-500 text-emerald-400 text-sm font-semibold whitespace-nowrap";
+                } else {
+                    pane.classList.add('hidden');
+                    btn.className = "px-4 py-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 text-sm font-semibold whitespace-nowrap";
+                }
+            });
+
+            refreshUserPane();
+        }
+
+        function refreshUserPane() {
+            if (!state.selectedServerId) return;
+            if (state.activeUserSubTab === 'whitelist') {
+                fetchWhitelist();
+            } else if (state.activeUserSubTab === 'ops') {
+                fetchOps();
+            } else if (state.activeUserSubTab === 'bans') {
+                fetchBans();
+            }
+        }
+
+        // 1. ホワイトリスト
+        async function fetchWhitelist() {
+            const body = document.getElementById('whitelist-table-body');
+            body.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-slate-500">読み込み中...</td></tr>';
+            try {
+                const data = await apiCall(`/api/servers/${state.selectedServerId}/whitelist`);
+                body.innerHTML = '';
+                
+                if (!data.whitelist || data.whitelist.length === 0) {
+                    body.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-slate-500">登録されているプレイヤーはいません</td></tr>';
+                    return;
+                }
+
+                data.whitelist.forEach(user => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-850 transition";
+                    
+                    const isPending = user.pending;
+                    const badge = isPending 
+                        ? '<span class="px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded text-xs">次回起動時に適用</span>'
+                        : '<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded text-xs">有効</span>';
+
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 font-semibold text-slate-200">${escapeHtml(user.name)}</td>
+                        <td class="px-6 py-4 font-mono text-xs text-slate-400">${user.uuid || '-'}</td>
+                        <td class="px-6 py-4">${badge}</td>
+                        <td class="px-6 py-4 text-right">
+                            <button onclick="deleteWhitelist('${user.uuid || ''}', '${user.name}')" class="text-rose-400 hover:text-rose-300 transition text-xs font-semibold flex items-center gap-1 ml-auto">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> 削除
+                            </button>
+                        </td>
+                    `;
+                    body.appendChild(tr);
+                });
+                lucide.createIcons();
+            } catch (err) {
+                body.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-rose-400">取得に失敗しました: ${err.message}</td></tr>`;
+            }
+        }
+
+        document.getElementById('whitelist-add-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('whitelist-input');
+            const name = input.value.trim();
+            if(!name || !state.selectedServerId) return;
+
+            try {
+                const res = await apiCall(`/api/servers/${state.selectedServerId}/whitelist`, 'POST', { name });
+                showToast(`ホワイトリストに追加しました: ${name} (${res.method || '成功'})`, 'success');
+                input.value = '';
+                fetchWhitelist();
+            } catch (err) {
+                showToast(`ホワイトリスト追加に失敗しました: ${err.message}`, 'error');
+            }
+        });
+
+        async function deleteWhitelist(uuid, name) {
+            // UUIDがない場合は名前を使って削除は仕様上 /api/servers/{id}/whitelist/{uuid} なので、仮に空の場合のために考慮
+            const identifier = uuid || name;
+            if (!confirm(`本当に「${name}」をホワイトリストから削除しますか？`)) return;
+
+            try {
+                await apiCall(`/api/servers/${state.selectedServerId}/whitelist/${identifier}`, 'DELETE');
+                showToast(`ホワイトリストから「${name}」を削除しました。`, 'success');
+                fetchWhitelist();
+            } catch (err) {
+                showToast(`削除に失敗しました: ${err.message}`, 'error');
+            }
+        }
+
+        // 2. OP権限
+        async function fetchOps() {
+            const body = document.getElementById('ops-table-body');
+            body.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-slate-500">読み込み中...</td></tr>';
+            try {
+                const data = await apiCall(`/api/servers/${state.selectedServerId}/ops`);
+                body.innerHTML = '';
+                
+                if (!data.ops || data.ops.length === 0) {
+                    body.innerHTML = '<tr><td colspan="3" class="px-6 py-8 text-center text-slate-500">OP権限を持つプレイヤーはいません</td></tr>';
+                    return;
+                }
+
+                data.ops.forEach(user => {
+                    tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-850 transition";
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 font-semibold text-slate-200">${escapeHtml(user.name)}</td>
+                        <td class="px-6 py-4 font-mono text-xs text-slate-400">${user.uuid || '-'}</td>
+                        <td class="px-6 py-4 text-right">
+                            <button onclick="deleteOps('${user.uuid || ''}', '${user.name}')" class="text-rose-400 hover:text-rose-300 transition text-xs font-semibold flex items-center gap-1 ml-auto">
+                                <i data-lucide="shield-off" class="w-3.5 h-3.5"></i> OP解除
+                            </button>
+                        </td>
+                    `;
+                    body.appendChild(tr);
+                });
+                lucide.createIcons();
+            } catch (err) {
+                body.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-rose-400">取得に失敗しました: ${err.message}</td></tr>`;
+            }
+        }
+
+        document.getElementById('ops-add-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('ops-input');
+            const name = input.value.trim();
+            if(!name || !state.selectedServerId) return;
+
+            try {
+                await apiCall(`/api/servers/${state.selectedServerId}/ops`, 'POST', { name });
+                showToast(`OP権限を付与しました: ${name}`, 'success');
+                input.value = '';
+                fetchOps();
+            } catch (err) {
+                showToast(`OP権限の付与に失敗しました: ${err.message}`, 'error');
+            }
+        });
+
+        async function deleteOps(uuid, name) {
+            const identifier = uuid || name;
+            if (!confirm(`本当に「${name}」のOP権限を解除しますか？`)) return;
+
+            try {
+                await apiCall(`/api/servers/${state.selectedServerId}/ops/${identifier}`, 'DELETE');
+                showToast(`「${name}」のOP権限を解除しました。`, 'success');
+                fetchOps();
+            } catch (err) {
+                showToast(`解除に失敗しました: ${err.message}`, 'error');
+            }
+        }
+
+        // 3. BANリスト
+        async function fetchBans() {
+            const body = document.getElementById('bans-table-body');
+            body.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-slate-500">読み込み中...</td></tr>';
+            try {
+                const data = await apiCall(`/api/servers/${state.selectedServerId}/bans`);
+                body.innerHTML = '';
+                
+                if (!data.bans || data.bans.length === 0) {
+                    body.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-slate-500">BANされたプレイヤーはいません</td></tr>';
+                    return;
+                }
+
+                data.bans.forEach(user => {
+                    tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-850 transition";
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 font-semibold text-slate-200">${escapeHtml(user.name)}</td>
+                        <td class="px-6 py-4 font-mono text-xs text-slate-400">${user.uuid || '-'}</td>
+                        <td class="px-6 py-4 text-slate-300 text-xs">${escapeHtml(user.reason || '理由なし')}</td>
+                        <td class="px-6 py-4 text-right">
+                            <button onclick="pardonBan('${user.name}')" class="text-emerald-400 hover:text-emerald-300 transition text-xs font-semibold flex items-center gap-1 ml-auto">
+                                <i data-lucide="smile" class="w-3.5 h-3.5"></i> BAN解除 (Pardon)
+                            </button>
+                        </td>
+                    `;
+                    body.appendChild(tr);
+                });
+                lucide.createIcons();
+            } catch (err) {
+                body.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-rose-400">取得に失敗しました: ${err.message}</td></tr>`;
+            }
+        }
+
+        async function pardonBan(name) {
+            if (!confirm(`本当に「${name}」のBANを解除しますか？`)) return;
+
+            try {
+                await apiCall(`/api/servers/${state.selectedServerId}/bans/${name}/pardon`, 'POST');
+                showToast(`「${name}」のBANを解除しました。`, 'success');
+                fetchBans();
+            } catch (err) {
+                showToast(`BAN解除に失敗しました: ${err.message}`, 'error');
+            }
+        }
+
+
+        // --- ヘルパーユーティリティ ---
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = "bg-slate-800 border-slate-700 text-slate-200";
+            let icon = "info";
+            
+            if (type === 'success') {
+                bgClass = "bg-emerald-950 border-emerald-800 text-emerald-300";
+                icon = "check-circle-2";
+            } else if (type === 'error') {
+                bgClass = "bg-rose-950 border-rose-800 text-rose-300";
+                icon = "alert-circle";
+            }
+
+            toast.className = `flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg text-sm transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto ${bgClass}`;
+            toast.innerHTML = `
+                <i data-lucide="${icon}" class="w-5 h-5 flex-shrink-0"></i>
+                <span>${escapeHtml(message)}</span>
+            `;
+            
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            // フェードイン
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            // 4秒後に自動消滅
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
