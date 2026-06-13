@@ -105,7 +105,6 @@
                 </div>
 
                 <div id="servers-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    <!-- サーバーカードが動的に挿入されます -->
                     <div class="col-span-full py-12 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl">
                         <i data-lucide="server" class="w-12 h-12 mx-auto mb-3 opacity-30"></i>
                         <p>接続設定が完了していないか、APIサーバーが起動していません。</p>
@@ -132,13 +131,10 @@
                     </div>
                 </div>
 
-                <!-- ログ出力エリア -->
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 font-mono text-sm h-[500px] overflow-y-auto flex flex-col gap-1 shadow-inner relative" id="log-container">
-                    <!-- ログ行がここに動的に生成されます -->
                     <div class="text-slate-500 text-center my-auto">サーバーを選択するか、ログを読み込んでください。</div>
                 </div>
 
-                <!-- コマンド入力フォーム -->
                 <form id="command-form" class="flex gap-2">
                     <input type="text" id="command-input" placeholder="コンソールコマンドを入力... (例: say Hello World)" class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500" disabled>
                     <button type="submit" id="command-submit" class="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 px-6 py-3 rounded-xl font-medium text-sm transition flex items-center gap-2 text-white" disabled>
@@ -177,9 +173,23 @@
                                 <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl text-sm font-medium transition text-white">追加</button>
                             </form>
                         </div>
-                        <button onclick="fetchWhitelist()" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition" title="再読み込み">
-                            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
-                        </button>
+                        <!-- CSV出力・入力・再読み込みのボタンエリア -->
+                        <div class="flex items-center gap-2">
+                            <button onclick="exportWhitelistToCSV()" class="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition" title="現在のホワイトリストをCSVでエクスポート">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                <span>CSV出力</span>
+                            </button>
+                            <button onclick="document.getElementById('csv-file-input').click()" class="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition" title="CSVファイルから一括インポート">
+                                <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                                <span>CSV入力</span>
+                            </button>
+                            <!-- 隠しファイルインプット -->
+                            <input type="file" id="csv-file-input" accept=".csv" class="hidden" onchange="handleCSVImport(event)">
+
+                            <button onclick="fetchWhitelist()" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition" title="再読み込み">
+                                <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
@@ -301,7 +311,7 @@
                         <i data-lucide="shield-alert" class="w-4 h-4 text-amber-500"></i>
                         セキュリティの注意事項
                     </h3>
-                    <p>このWebアプリは完全にブラウザ上で動作します。入力したパスワードは外部サーバーには送信されず、お使いのブラウザのローカルストレージ（localStorage）のみに保存されます。</p>
+                    <p>このWebアプリは完全にブラウザ上で動作します。入力したパスワードは外部サーバーには送信されず、お使い of ブラウザのローカルストレージ（localStorage）のみに保存されます。</p>
                     <p>Web APIは暗号化されていない HTTP 通信のため、外出先からアクセスする際はポート開放ではなく、<strong>Tailscale</strong> などの VPN 接続を経由することを強く推奨します。</p>
                 </div>
             </section>
@@ -458,7 +468,6 @@
                     select.appendChild(option);
                 });
 
-                // 初期選択サーバーがない場合、リストの最初を選択
                 if (!state.selectedServerId && state.servers.length > 0) {
                     state.selectedServerId = state.servers[0].id;
                     select.value = state.selectedServerId;
@@ -475,7 +484,6 @@
             state.selectedServerId = e.target.value;
             updateSelectedServerLabels();
             
-            // タブ特有の更新処理をキック
             if (state.activeTab === 'console') {
                 fetchLogs();
             } else if (state.activeTab === 'users') {
@@ -503,7 +511,6 @@
 
         // --- タブ遷移制御 ---
         function initTabs() {
-            // タブ自動切替
             switchTab('dashboard');
         }
 
@@ -524,7 +531,6 @@
                 }
             });
 
-            // バックグラウンド処理の管理
             stopAllPolling();
             if (tabId === 'dashboard') {
                 refreshDashboard();
@@ -545,7 +551,7 @@
         function startDashboardPolling() {
             state.pollingIntervals.dashboard = setInterval(() => {
                 if (state.isConnected && state.activeTab === 'dashboard') {
-                    refreshDashboard(true); // サイレント更新
+                    refreshDashboard(true);
                 }
             }, 5000);
         }
@@ -602,7 +608,6 @@
             const div = document.createElement('div');
             div.className = "bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700 transition flex flex-col gap-4";
 
-            // ステータスバッジのスタイル設定
             let statusColor = "bg-slate-850 text-slate-400";
             let statusText = srv.status;
             let dotPulse = "";
@@ -624,7 +629,6 @@
                 dotPulse = '<span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-bounce mr-1"></span>';
             }
 
-            // 起動時間フォーマット
             const uptimeStr = srv.uptime ? formatUptime(srv.uptime) : '-';
 
             div.innerHTML = `
@@ -657,7 +661,6 @@
                     </div>
                 </div>
 
-                <!-- 操作ボタン群 -->
                 <div class="grid grid-cols-2 gap-2 mt-auto">
                     <button onclick="controlServer('${srv.id}', 'start')" class="flex items-center justify-center gap-1.5 bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-600 hover:text-white px-3 py-2 rounded-lg text-xs font-semibold transition" ${srv.status !== 'stopped' ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''}>
                         <i data-lucide="play" class="w-3.5 h-3.5"></i>
@@ -711,7 +714,6 @@
                 const data = await apiCall(`/api/servers/${state.selectedServerId}/logs`);
                 const container = document.getElementById('log-container');
                 
-                // 初回のみ・あるいはログ件数変更があったときに完全に書き換える
                 container.innerHTML = '';
                 
                 if (!data.logs || data.logs.length === 0) {
@@ -723,7 +725,6 @@
                     const line = document.createElement('div');
                     line.className = "leading-relaxed break-all";
                     
-                    // レベルに応じたカラーパッシブ
                     let colorClass = "text-slate-300";
                     if (log.level === 'WARN') {
                         colorClass = "text-amber-400 font-semibold";
@@ -737,7 +738,6 @@
                     container.appendChild(line);
                 });
 
-                // 一番下にスクロール
                 container.scrollTop = container.scrollHeight;
 
             } catch (err) {
@@ -760,7 +760,7 @@
                 if (data.ok) {
                     showToast(`コマンドを送信しました: ${cmd}`, 'success');
                     input.value = '';
-                    fetchLogs(); // 即座に再読み込み
+                    fetchLogs();
                 }
             } catch (err) {
                 showToast(`コマンド送信失敗: ${err.message}`, 'error');
@@ -800,7 +800,7 @@
             }
         }
 
-        // 1. ホワイトリスト
+        // 1. ホワイトリスト: 取得
         async function fetchWhitelist() {
             const body = document.getElementById('whitelist-table-body');
             body.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-slate-500">読み込み中...</td></tr>';
@@ -819,8 +819,8 @@
                     
                     const isPending = user.pending;
                     const badge = isPending 
-                        ? '<span class="px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded text-xs">次回起動時に適用</span>'
-                        : '<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded text-xs">有効</span>';
+                        ? '<span class="px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded text-xs font-semibold">保留中 (統合版)</span>'
+                        : '<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded text-xs font-semibold">有効</span>';
 
                     tr.innerHTML = `
                         <td class="px-6 py-4 font-semibold text-slate-200">${escapeHtml(user.name)}</td>
@@ -840,6 +840,7 @@
             }
         }
 
+        // ホワイトリスト: 単体追加
         document.getElementById('whitelist-add-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const input = document.getElementById('whitelist-input');
@@ -856,8 +857,8 @@
             }
         });
 
+        // ホワイトリスト: 単体削除
         async function deleteWhitelist(uuid, name) {
-            // UUIDがない場合は名前を使って削除は仕様上 /api/servers/{id}/whitelist/{uuid} なので、仮に空の場合のために考慮
             const identifier = uuid || name;
             if (!confirm(`本当に「${name}」をホワイトリストから削除しますか？`)) return;
 
@@ -870,7 +871,123 @@
             }
         }
 
-        // 2. OP権限
+        // --- CSV エクスポート (出力) 機能 ---
+        async function exportWhitelistToCSV() {
+            if (!state.selectedServerId) {
+                showToast('サーバーが選択されていません', 'error');
+                return;
+            }
+            try {
+                const data = await apiCall(`/api/servers/${state.selectedServerId}/whitelist`);
+                const list = data.whitelist || [];
+                if (list.length === 0) {
+                    showToast('エクスポートするプレイヤーがいません', 'info');
+                    return;
+                }
+
+                // UTF-8 の BOM を先頭に付与してExcelでの文字化けを防止
+                let csvContent = "\uFEFFName,UUID,Pending\r\n";
+                list.forEach(user => {
+                    const escapedName = user.name.replace(/"/g, '""');
+                    csvContent += `"${escapedName}","${user.uuid || ''}",${user.pending}\r\n`;
+                });
+
+                const current = state.servers.find(s => s.id === state.selectedServerId);
+                const serverName = current ? current.name : 'server';
+                
+                // Blobオブジェクトを作成して安全にダウンロードリンクを生成
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", `whitelist_${serverName}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                showToast('CSVファイルを書き出しました', 'success');
+            } catch (err) {
+                showToast(`CSV出力に失敗しました: ${err.message}`, 'error');
+            }
+        }
+
+        // --- CSV インポート (入力) 機能 ---
+        async function handleCSVImport(event) {
+            const file = event.target.files[0];
+            if (!file || !state.selectedServerId) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                const lines = text.split(/\r?\n/);
+                const namesToImport = [];
+
+                lines.forEach((line, index) => {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine) return;
+
+                    // カンマ区切りの単純パース（ダブルクォーテーション対応）
+                    const cols = trimmedLine.split(',').map(col => {
+                        return col.trim().replace(/^["']|["']$/g, ''); // 囲み文字の解除
+                    });
+
+                    // 1列目 (Name) を抽出
+                    const name = cols[0];
+                    if (!name) return;
+
+                    // ヘッダー行をスキップ (1行目かつ列名がそれらしいキーワードの場合)
+                    if (index === 0 && (name.toLowerCase() === 'name' || name.toLowerCase() === 'username' || name === 'プレイヤー名')) {
+                        return;
+                    }
+
+                    namesToImport.push(name);
+                });
+
+                if (namesToImport.length === 0) {
+                    showToast('有効なプレイヤー名がCSV内に見つかりませんでした。', 'error');
+                    event.target.value = '';
+                    return;
+                }
+
+                const confirmed = confirm(`CSVから ${namesToImport.length} 名のプレイヤーをインポートします。よろしいですか？`);
+                if (!confirmed) {
+                    event.target.value = '';
+                    return;
+                }
+
+                showToast(`一括登録を開始します... (0/${namesToImport.length})`, 'info');
+
+                let successCount = 0;
+                let failCount = 0;
+
+                // サーバーへの負荷を考慮して、直列非同期で順次追加リクエストを送る
+                for (let i = 0; i < namesToImport.length; i++) {
+                    const name = namesToImport[i];
+                    try {
+                        await apiCall(`/api/servers/${state.selectedServerId}/whitelist`, 'POST', { name });
+                        successCount++;
+                    } catch (err) {
+                        console.error(`Import failed for ${name}:`, err);
+                        failCount++;
+                    }
+                }
+
+                if (successCount > 0) {
+                    showToast(`インポート完了: ${successCount}件追加に成功、${failCount}件に失敗しました。`, 'success');
+                    fetchWhitelist();
+                } else {
+                    showToast(`インポートに失敗しました。すべてエラーとなったか、接続状況が悪い可能性があります。`, 'error');
+                }
+
+                event.target.value = ''; // ファイルインプットの選択をリセット
+            };
+
+            reader.readAsText(file);
+        }
+
+
+        // 2. OP権限: 取得
         async function fetchOps() {
             const body = document.getElementById('ops-table-body');
             body.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-slate-500">読み込み中...</td></tr>';
@@ -884,7 +1001,7 @@
                 }
 
                 data.ops.forEach(user => {
-                    tr = document.createElement('tr');
+                    const tr = document.createElement('tr');
                     tr.className = "hover:bg-slate-850 transition";
                     tr.innerHTML = `
                         <td class="px-6 py-4 font-semibold text-slate-200">${escapeHtml(user.name)}</td>
@@ -946,7 +1063,7 @@
                 }
 
                 data.bans.forEach(user => {
-                    tr = document.createElement('tr');
+                    const tr = document.createElement('tr');
                     tr.className = "hover:bg-slate-850 transition";
                     tr.innerHTML = `
                         <td class="px-6 py-4 font-semibold text-slate-200">${escapeHtml(user.name)}</td>
@@ -1004,12 +1121,10 @@
             container.appendChild(toast);
             lucide.createIcons();
 
-            // フェードイン
             setTimeout(() => {
                 toast.classList.remove('translate-y-2', 'opacity-0');
             }, 10);
 
-            // 4秒後に自動消滅
             setTimeout(() => {
                 toast.classList.add('translate-y-2', 'opacity-0');
                 setTimeout(() => toast.remove(), 300);
